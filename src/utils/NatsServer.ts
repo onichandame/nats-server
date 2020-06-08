@@ -12,6 +12,8 @@ import { cacheDir } from "./cacheDir"
 
 type Props = {
   port: number
+  clusterPort?: number
+  routePorts?: number[]
   executable?: {
     name: string
     path?: string
@@ -24,9 +26,11 @@ export class NatsServer {
   public up: boolean
   private _executable: string
   private exeName: string
-  private process?: ChildProcess
+  private process?: Promise<ChildProcess>
   private port: number
-  constructor({ port, executable }: Props) {
+  private clusterPort?: number
+  private routePorts?: number[]
+  constructor({ port, executable, clusterPort, routePorts }: Props) {
     executable &&
       executable.path &&
       (executable.name = resolve(
@@ -36,7 +40,14 @@ export class NatsServer {
     this.exeName = executable?.name || "nats-server"
     this._executable = ""
     this.port = port
+    this.clusterPort = clusterPort
+    this.routePorts = routePorts
     this.up = false
+    process.on("exit", async () => await this.close())
+    process.on("SIGINT", async () => await this.close())
+    process.on("SIGUSR1", async () => await this.close())
+    process.on("SIGUSR2", async () => await this.close())
+    process.on("uncaughtException", async () => await this.close())
   }
   static async cachedExe() {
     return resolve(await cacheDir(), "nats-server")
@@ -85,26 +96,37 @@ export class NatsServer {
   public async start(): Promise<ChildProcess> {
     log("called NatsServer.start")
     if (!this.process) {
-      this.process = spawn(
-        await this.executable(),
-        ["-p", this.port.toString()],
-        { stdio: "pipe" }
-      )
-      this.process?.stderr?.on("error", e =>
-        log(JSON.stringify(e.message || e))
-      )
-      log("child process spawned")
-      const started = Date.now()
-      await new Promise(async (r, j) => {
+      this.process = new Promise(async (r, j) => {
+        const process = spawn(
+          await this.executable(),
+          [
+            "-p",
+            this.port.toString(),
+            ...(this.routePorts && this.clusterPort
+              ? [
+                  "-routes",
+                  this.routePorts.map(p => `nats://localhost:${p}`).join(",")
+                ]
+              : []),
+            ...(this.clusterPort
+              ? ["-cluster", `nats://localhost:${this.clusterPort}`]
+              : [])
+          ],
+          { stdio: "pipe" }
+        )
+        process.stderr?.on("error", e => log(JSON.stringify(e.message || e)))
+        log("child process spawned")
+        const started = Date.now()
         const timer = setInterval(() => {
           const con = createConnection(this.port)
           con.on("connect", () => {
-            if (this.process?.pid) {
+            if (process.pid) {
               log("nats server started")
               con.end()
               this.up = true
-              r()
+              r(process)
               clearInterval(timer)
+              con.end()
             }
           })
           con.on("error", e => {
@@ -119,12 +141,6 @@ export class NatsServer {
     return this.process
   }
   public async close() {
-    return new Promise(r => {
-      this.process?.once("exit", () => {
-        log("nats server stopped")
-        r()
-      })
-      this.process?.kill()
-    })
+    return this.process?.then(p => p!.kill())
   }
 }

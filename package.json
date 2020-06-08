@@ -1,11 +1,11 @@
 {
-  "version": "0.1.0",
+  "version": "0.0.0",
   "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
   "files": [
     "dist",
-    "src"
+    "postinstall.js"
   ],
   "engines": {
     "node": ">=10"
@@ -16,12 +16,14 @@
     "test": "env DEBUG=* tsdx test",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
     "lint": "yarn format",
+    "postinstall": "node ./postinstall.js",
     "prepare": "tsdx build"
   },
   "peerDependencies": {},
   "husky": {
     "hooks": {
-      "pre-commit": "tsdx lint"
+      "pre-commit": "yarn lint",
+      "pre-push": "tsdx build"
     }
   },
   "name": "nats-server",
@@ -49,6 +51,7 @@
     "cross-spawn": "^7.0.3",
     "debug": "^4.1.1",
     "find-cache-dir": "^3.3.1",
+    "regenerator-runtime": "^0.13.5",
     "which": "^2.0.2"
   }
 }

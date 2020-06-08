@@ -1,27 +1,49 @@
-# TSDX Bootstrap
+# NATS Server
 
-This project was bootstrapped with [TSDX](https://github.com/jaredpalmer/tsdx).
+This tool bootstraps a NATS server/cluster for development purposes. Inspired by [this repo][mongo]. **DO NOT USE FOR PRODUCTION**
 
-## Local Development
+# Author
 
-Below is a list of commands you will probably find useful.
+[onichandame](https://github/onichandame/nats-server)
 
-### `npm start` or `yarn start`
+# Usage
 
-Runs the project in development/watch mode. Your project will be rebuilt upon changes. TSDX has a special logger for you convenience. Error messages are pretty printed and formatted for compatibility VS Code's Problems tab.
+Installation(downloads NATS server binary if not found in path):
 
-<img src="https://user-images.githubusercontent.com/4060187/52168303-574d3a00-26f6-11e9-9f3b-71dbec9ebfcb.gif" width="600" />
+```bash
+yarn add -D nats-server
+```
 
-Your library will be rebuilt if you make edits.
+Test scripts:
 
-### `npm run build` or `yarn build`
+```typescript
+import { Server, Cluster } from 'nats-server'
+import { connect } from 'ts-nats'
 
-Bundles the package to the `dist` folder.
-The package is optimized and bundled with Rollup into multiple formats (CommonJS, UMD, and ES Module).
+describe("module1", () => {
+  const server: Server
+  const cluster: Cluster
+  beforeAll(() => {
+    server = new Server()
+    cluster = new Cluster()
+  })
+  test("can connect to NATS", async done => {
+    let nc = await connect(await server.getUri())
+    nc = await connect({servers: await cluster.getUris()})
+    console.log("Able to connect to the test NATS cluster!")
+    done()
+  })
+  afterAll(async () => {
+    await server.stop()
+    await cluster.stop()
+  })
+})
+```
 
-<img src="https://user-images.githubusercontent.com/4060187/52168322-a98e5b00-26f6-11e9-8cf6-222d716b75ef.gif" width="600" />
+# Known Issues
 
-### `npm test` or `yarn test`
+1. does not support Windows. May work on OSX(not tested as I do not possess a Mac)
+2. Not fully tested yet so there may be server instances dangling around after the main process exits abnormally. Make sure you call `await server.stop()` to clean it up and check `ps aux | grep nats-server` if process exits before `server.stop()` is resolved.
+3. requires to open ports between 10000 and 12000. This limit is hard coded for now. Let me know if a customization is desirable.
 
-Runs the test watcher (Jest) in an interactive mode.
-By default, runs tests related to files changed since the last commit.
+[mongo]: https://github.com/nodkz/mongodb-memory-server

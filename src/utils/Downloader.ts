@@ -19,7 +19,7 @@ const log = debug("NatsServer:Downloader")
 export class Downloader {
   private version: string
   private repo: string
-  static downloading: boolean = false
+  static downloading?: Promise<string>
   constructor({ version, repo }: Props = {}) {
     this.version = version || "2.1.7"
     this.repo =
@@ -46,38 +46,34 @@ export class Downloader {
   }
   async download(): Promise<string> {
     log("called Downloader download")
-    if (Downloader.downloading)
-      throw new Error(
-        "there is a download process running! wait till it finishes to avoid conflict"
-      )
-    await fsp
-      .access(await this.filePath())
-      .then(async () => fsp.unlink(await this.filePath()))
-      .catch(e => {
-        if (e.code !== "ENOENT") throw e
+    if (Downloader.downloading) return Downloader.downloading
+    Downloader.downloading = new Promise(async (r, j) => {
+      await fsp
+        .access(await this.filePath())
+        .then(async () => fsp.unlink(await this.filePath()))
+        .catch(e => {
+          if (e.code !== "ENOENT") throw e
+        })
+      const file = createWriteStream(await this.filePath())
+      const res = await this.getResponse(this.url)
+      log("starting download")
+      if (!res.headers["content-length"])
+        throw new Error("content length is empty")
+      let totalBytes = parseInt(res.headers["content-length"] || "", 10)
+      let currentBytes = 0
+      const progress = new SingleBar({}, Presets.shades_classic)
+      progress.start(totalBytes, currentBytes)
+      res.pipe(file)
+      res.on("data", data => {
+        currentBytes += data.length
+        process.env.DEBUG &&
+          process.stdout.write(
+            `Nats server download progress ${Math.round(
+              (currentBytes / totalBytes) * 100
+            )}%${platform().includes("win32") ? "\x1b[0G" : "\r"}`
+          )
+        progress.increment(data.length)
       })
-    const file = createWriteStream(await this.filePath())
-    Downloader.downloading = true
-    const res = await this.getResponse(this.url)
-    log("starting download")
-    if (!res.headers["content-length"])
-      throw new Error("content length is empty")
-    let totalBytes = parseInt(res.headers["content-length"] || "", 10)
-    let currentBytes = 0
-    const progress = new SingleBar({}, Presets.shades_classic)
-    progress.start(totalBytes, currentBytes)
-    res.pipe(file)
-    res.on("data", data => {
-      currentBytes += data.length
-      process.env.DEBUG &&
-        process.stdout.write(
-          `Nats server download progress ${Math.round(
-            (currentBytes / totalBytes) * 100
-          )}%${platform().includes("win32") ? "\x1b[0G" : "\r"}`
-        )
-      progress.increment(data.length)
-    })
-    return new Promise((r, j) => {
       file.on("finish", () => {
         if (currentBytes < totalBytes)
           j(new Error(`download not complete! ${currentBytes}/${totalBytes}`))
@@ -90,6 +86,7 @@ export class Downloader {
         j(new Error(`cannot download due to ${JSON.stringify(e.message || e)}`))
       })
     })
+    return Downloader.downloading
   }
   private async getResponse(url: string): Promise<IncomingMessage> {
     log(`called Downloader getResponse with url ${url}`)

@@ -42,6 +42,6 @@ describe("Nats server", () => {
     await nc.flush()
   })
   afterAll(async () => {
-    server.close()
+    await server.close()
   })
 })
