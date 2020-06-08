@@ -12,7 +12,7 @@ type Props = {
     | { master: true }
 }
 
-const log = debug("Server")
+const log = debug("NatsServer:Server")
 
 //babel does not support regenerator well. has conflict with while(await)
 //async function* genPort(): AsyncGenerator<number, number> {

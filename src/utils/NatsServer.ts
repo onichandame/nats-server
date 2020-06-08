@@ -20,7 +20,7 @@ type Props = {
   }
 }
 
-const log = debug("NatsServer")
+const log = debug("NatsServer:NatsServer")
 
 export class NatsServer {
   public up: boolean

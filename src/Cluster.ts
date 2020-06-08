@@ -2,7 +2,7 @@ import debug from "debug"
 
 import { Server } from "./Server"
 
-const log = debug("Cluster")
+const log = debug("NatsServer:Cluster")
 
 type Props = {
   count: number
