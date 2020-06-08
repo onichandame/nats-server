@@ -131,8 +131,8 @@ export class NatsServer {
               }
             })
             con.on("error", e => {
-              if (Date.now() - started > 1000 * 2) {
-                log(`failed to start server after 2s`)
+              if (Date.now() - started > 1000 * 60) {
+                log(`failed to start server after 60s`)
                 j(e)
               }
             })
