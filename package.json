@@ -16,7 +16,8 @@
     "test": "env DEBUG=* tsdx test",
     "format": "prettier --write \"src/**/*.{ts,tsx,js,jsx,json,md}\"",
     "lint": "yarn format",
-    "postinstall": "yarn build || node ./postinstall.js",
+    "postinstall": "yarn download || (yarn build && yarn download)",
+    "download":"node ./postinstall.js",
     "prepare": "tsdx build"
   },
   "peerDependencies": {},

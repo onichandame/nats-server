@@ -97,45 +97,50 @@ export class NatsServer {
     log("called NatsServer.start")
     if (!this.process) {
       this.process = new Promise(async (r, j) => {
-        const process = spawn(
-          await this.executable(),
-          [
-            "-p",
-            this.port.toString(),
-            ...(this.routePorts && this.clusterPort
-              ? [
-                  "-routes",
-                  this.routePorts.map(p => `nats://localhost:${p}`).join(",")
-                ]
-              : []),
-            ...(this.clusterPort
-              ? ["-cluster", `nats://localhost:${this.clusterPort}`]
-              : [])
-          ],
-          { stdio: "pipe" }
-        )
-        process.stderr?.on("error", e => log(JSON.stringify(e.message || e)))
-        log("child process spawned")
-        const started = Date.now()
-        const timer = setInterval(() => {
-          const con = createConnection(this.port)
-          con.on("connect", () => {
-            if (process.pid) {
-              log("nats server started")
-              con.end()
-              this.up = true
-              r(process)
-              clearInterval(timer)
-              con.end()
-            }
-          })
-          con.on("error", e => {
-            if (Date.now() - started > 1000 * 2) {
-              log(`failed to start server after 2s`)
-              j(e)
-            }
-          })
-        }, 100)
+        try {
+          const process = spawn(
+            await this.executable(),
+            [
+              "-p",
+              this.port.toString(),
+              ...(this.routePorts && this.clusterPort
+                ? [
+                    "-routes",
+                    this.routePorts.map(p => `nats://localhost:${p}`).join(",")
+                  ]
+                : []),
+              ...(this.clusterPort
+                ? ["-cluster", `nats://localhost:${this.clusterPort}`]
+                : [])
+            ],
+            { stdio: "pipe" }
+          )
+          process.stderr?.on("error", e => log(JSON.stringify(e.message || e)))
+          log("child process spawned")
+          const started = Date.now()
+          const timer = setInterval(() => {
+            const con = createConnection(this.port)
+            con.on("connect", () => {
+              if (process.pid) {
+                log("nats server started")
+                con.end()
+                this.up = true
+                r(process)
+                clearInterval(timer)
+                con.end()
+              }
+            })
+            con.on("error", e => {
+              if (Date.now() - started > 1000 * 2) {
+                log(`failed to start server after 2s`)
+                j(e)
+              }
+            })
+          }, 100)
+        } catch (e) {
+          log(`failed to spawn due to ${JSON.stringify(e.message || e)}`)
+          j(e)
+        }
       })
     }
     return this.process
