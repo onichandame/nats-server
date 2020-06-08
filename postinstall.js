@@ -1,4 +1,4 @@
-const { Server } = require("./dist")
+const { Server } = require(".")
 
 const server = new Server()
 ;(async () => {
