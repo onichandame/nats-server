@@ -113,7 +113,7 @@ export class NatsServer {
                 ? ["-cluster", `nats://localhost:${this.clusterPort}`]
                 : [])
             ],
-            { stdio: "pipe" }
+            { stdio: "inherit" }
           )
           process.stderr?.on("error", e => log(JSON.stringify(e.message || e)))
           log("child process spawned")
@@ -130,10 +130,11 @@ export class NatsServer {
                 con.end()
               }
             })
-            con.on("error", e => {
-              if (Date.now() - started > 1000 * 60) {
-                log(`failed to start server after 60s`)
-                j(e)
+            con.on("error", () => {
+              if (Date.now() - started > 1000 * 2) {
+                const msg = `failed to start server after 2s`
+                log(msg)
+                j(msg)
               }
             })
           }, 100)
